@@ -5,9 +5,10 @@ import sys
 import os
 import tensorflow as tf
 import numpy as np
-import datareader as dr
-import sen2vec_w as wv
+import datareader_new as dr
+import text_model as t2v
 from gensim.models import word2vec
+from gensim.models import doc2vec
 from sklearn.metrics import roc_auc_score
 
 # initial weight
@@ -46,19 +47,29 @@ if __name__=="__main__":
 	# import data [ x_number, x_label, x_text, y ]
 	print "Import data ..."
 	#[x_number, x_label, x_text, y] = dr.read_raw_data(file_path, data_length)
-	x_number = np.fromfile("../CTRData/x_number.data")
-	x_number.shape = 8000000, 30
-	x_label = np.fromfile("../CTRData/x_label.data")
-	x_label.shape = 8000000, 6
+	#x_number.tofile('x_number_new.data')
+	#x_label.tofile('x_label_new.data')
+	#x_text.tofile('x_text_new.data')
+	#y.tofile('y_new.data')
+	x_number = np.fromfile("./x_number_new.data")
+	x_number.shape = 8000000, 29
+	x_number_train = x_number[0:4000000, :]
+	x_number_test  = x_number[4000000:, :]
+	x_label = np.fromfile("./x_label_new.data")
+	x_label.shape = 8000000, 73
+	x_label_train = x_label[0:4000000, :]
+	x_label_test  = x_label[4000000:, :]
 	#x_text = np.full(shape=(8000000,1),fill_value="",dtype='|S100')
-	#x_text_file = open("../CTRData/title_corpus", 'r')
+	#x_text_file = open("../title_corpus", 'r')
 	#line_cnt = 0
 	#for line in x_text_file.readlines():
 	#	x_text[line_cnt, 0] = line.strip()
 	#	line_cnt = line_cnt + 1
-	y = np.fromfile("../CTRData/y.data")
+	y = np.fromfile("./y_new.data")
 	y = y.astype(int)
 	y = np.eye(2)[y]
+	y_train = y[0:4000000]
+	y_test  = y[4000000:]
 	x_number_dim = x_number.shape[1]
 	x_label_dim = x_label.shape[1]
 	x_text_dim = 200
@@ -66,15 +77,17 @@ if __name__=="__main__":
 
 	# text 2 vec
 	print "Text2vector ..."
-	#word2vec_model_path = "text_model/merged_word_vec.model"
-	#word2vec_model = word2vec.Word2Vec.load(word2vec_model_path)
+	#word2vec_model_path = "text_model/gens_doc2vec/gd2v_sen2vec.model"
+	#word2vec_model = doc2vec.Doc2Vec.load(word2vec_model_path)
 	#x_text_vec = np.zeros(shape=(data_length, x_text_dim))
 	#for i in range(data_length):
 	#	print i,'\r',
-	#	x_text_vec[i,:] = wv.sen2vec(x_text[i,0], word2vec_model, x_text_dim)
-	#x_text_vec.tofile("../x_text_vec.data")
-	x_text_vec = np.fromfile("../CTRData/x_text_vec.data")
+	#	x_text_vec[i,:] = t2v.gd2v_sen2vec(x_text[i,0], word2vec_model, x_text_dim)
+	#x_text_vec.tofile("/x_text_vec_new.data")
+	x_text_vec = np.fromfile("./x_text_vec_new.data")
 	x_text_vec.shape = 8000000, 200
+	x_text_vec_train = x_text_vec[0:4000000,:]
+	x_text_vec_test  = x_text_vec[4000000:]
 	
 	# placeholder
 	print "Initialize model ..."
@@ -83,18 +96,12 @@ if __name__=="__main__":
 	x_text_ph = tf.placeholder(tf.float32, [None, x_text_dim])
 	y_ph = tf.placeholder(tf.float32, [None, 2])
 	# weights notext
-	w_num = init_weights([30, 30])
-	b_num = init_bias([30])
-	h1_num = tf.nn.relu(tf.matmul(x_number_ph, w_num)+b_num)
-	w_lab = init_weights([6, 6])
-	b_lab = init_bias([6])
-	h1_lab = tf.nn.relu(tf.matmul(x_label_ph, w_lab)+b_lab)
-	w_nontxt = init_weights([36, 36])
-	b_nontxt = init_bias([36])
-	h2_nontext = tf.nn.relu(tf.matmul(tf.concat(1, [h1_num, h1_lab]), w_nontxt)+b_nontxt)
+	w_nontxt = init_weights([102, 102])
+	b_nontxt = init_bias([102])
+	h2_nontext = tf.nn.relu(tf.matmul(tf.concat(1, [x_number_ph, x_label_ph]), w_nontxt)+b_nontxt)
 	# text2vec
 	# feture engineer all
-	w_fea_eng = init_weights([236, 500])
+	w_fea_eng = init_weights([302, 500])
 	b_fea_eng = init_bias([500])
 	h3 = tf.nn.relu(tf.matmul(tf.concat(1, [h2_nontext, x_text_ph]), w_fea_eng)+b_fea_eng)
 	# feature selection
@@ -134,22 +141,22 @@ if __name__=="__main__":
 			print "Model train ..."
 			for i in range(1000):
 				#print "epoch ", i
-				index_arr = np.arange(data_length)
+				index_arr = np.arange(data_length/2)
 				np.random.shuffle(index_arr)
 				start = 0
-				while start < data_length:
+				while start < data_length/2:
 					end = start + batch_size
 					index_arr_tmp = (index_arr[start:end], )
 					#print x_number[index_arr_tmp]
-					feed_dict={x_number_ph: x_number[index_arr_tmp], 
-						   x_label_ph: x_label[index_arr_tmp], 
-						   x_text_ph: x_text_vec[index_arr_tmp], 
-						   y_ph: y[index_arr_tmp]}
+					feed_dict={x_number_ph: x_number_train[index_arr_tmp], 
+						   x_label_ph: x_label_train[index_arr_tmp], 
+						   x_text_ph: x_text_vec_train[index_arr_tmp], 
+						   y_ph: y_train[index_arr_tmp]}
 					_, loss_tmp = sess.run([train_op, loss], feed_dict=feed_dict)
 					print loss_tmp, "\r",
 					start = end
-				dnn_test(sess, x_number, x_label, x_text_vec, data_length)
-				os.system("./fastAUC.bash tmp.predicts ../CTRData/1_data_y tmp.auc > tmp")
+				dnn_test(sess, x_number_test, x_label_test, x_text_vec_test, data_length/2)
+				os.system("./fastAUC.bash tmp.predicts ../CTRData/1_data_y_test tmp.auc > tmp")
 				auc_file = open('tmp.auc', 'r')
 				train_auc = auc_file.readline()
 				print train_auc,

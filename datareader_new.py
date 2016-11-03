@@ -10,20 +10,20 @@ import re
 # read raw data
 def read_raw_data( file_path, data_length ):
 	x_num_index = [15, 19, 21, 25, 27, 29, 31, 33, 35, 37, 39, 43, 49, 55, 57, 59, 61, 63, 65, 67, 69, 71, 73, 77, 79, 81, 87, 89, 91]
-	# 602 [channelFstLevel] : [0,45]
-	# 605 [titleIsImageSet] : [0,1]
-	# 617 [userSex] : [0,2]
-	# 619 [showListLoc]: [1,20]
-	# 620 [crossAreaNewsArea] : [0,1]
-	# 648 [newsIsListImage] : [0,1]
-	# 652 [newsIsBigImage] : [0,1]
+	# 602 [channelFstLevel] : [0,45]	len[46]
+	# 605 [titleIsImageSet] : [0,1] 	len[1]
+	# 617 [userSex] : [0,2]			len[3]
+	# 619 [showListLoc]: [1,20]		len[20]
+	# 620 [crossAreaNewsArea] : [0,1]	len[1]
+	# 648 [newsIsListImage] : [0,1]		len[1]
+	# 652 [newsIsBigImage] : [0,1]		len[1]
 	x_lab_index = [17, 23, 47, 51, 53, 85, 93]
 	# 502 [titleText] : [string length=100]
 	x_text_index= [5]
 	y_index = [1]
 
 	x_num = np.zeros(shape=(data_length, len(x_num_index)))
-	x_lab = np.zeros(shape=(data_length, len(x_lab_index)))
+	x_lab = np.zeros(shape=(data_length, 73))
 	x_text = np.full(shape=(data_length, 1), fill_value="", dtype='|S100')
 	y = np.zeros(shape=(data_length, 1))	
 
@@ -57,7 +57,7 @@ def read_raw_data( file_path, data_length ):
 			y_tmp = linebits['a1']
 
 		x_num_tmp = np.asarray(x_num_tmp).astype("float")
-		x_lab_tmp = np.asarray(x_lab_tmp).astype("float")
+		x_lab_tmp = np.asarray(x_lab_tmp).astype("int")
 		y_tmp = np.asarray(y_tmp).astype("float")
 		x_text_tmp = x_text_tmp.split('\x03')
 		x_text_tmp = ' '.join(x_text_tmp)
@@ -68,10 +68,17 @@ def read_raw_data( file_path, data_length ):
 		title_text.write(x_text_tmp+'\n')
 		
 		x_num[line_cnt, :] = x_num_tmp
-		x_lab[line_cnt, :] = x_lab_tmp
+		#x_lab[line_cnt, :] = x_lab_tmp
+		x_lab[line_cnt, 0:46] = np.eye(46)[x_lab_tmp[0]]
+		x_lab[line_cnt, 46]   = x_lab_tmp[1]
+		x_lab[line_cnt, 47:50] = np.eye(3)[x_lab_tmp[2]]
+		x_lab[line_cnt, 50:70] = np.eye(20)[x_lab_tmp[3]-1]
+		x_lab[line_cnt, 70] = x_lab_tmp[4]
+		x_lab[line_cnt, 71] = x_lab_tmp[5]
+		x_lab[line_cnt, 72] = x_lab_tmp[6]
 		x_text[line_cnt] = x_text_tmp
 		y[line_cnt] = y_tmp
 		line_cnt = line_cnt + 1
-
+		print line_cnt,'\r',
 
 	return x_num, x_lab, x_text, y
